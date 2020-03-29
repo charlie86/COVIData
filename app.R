@@ -169,7 +169,7 @@ ui <- f7Page(
             HTML(
           paste0(
             'Only counties with at least 10 cases are included. Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
-            <br>Note that data from all of New York City is labelled as New York County (Manhattan).
+            <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
             <br>Data from <a href="https://github.com/nytimes/covid-19-data">The New York Times</a>, last updated ',
             format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard">GitHub</a> for code.'
             )
@@ -222,7 +222,7 @@ server <- function(input, output, session) {
   output$state_title <- renderUI({
     div(style = 'display:inline-block',
         div(style = 'display:inline-block;vertical-align:middle;', h2('COVID-19 total cases by county:')),
-        div(style = 'display:inline-block;vertical-align:middle;margin-bottom:7px;font-size:20px !important;', f7Select('state', '', choices = sort(unique(county_calc$state)), selected = 'New York'))
+        div(style = 'display:inline-block;vertical-align:middle;margin-bottom:7px;font-size:20px !important;', f7Select('state', '', choices = sort(unique(county_calc$state[!county_calc$state %in% c('Guam', 'Virgin Islands')])), selected = 'New York'))
     )
   })
   
