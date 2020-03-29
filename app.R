@@ -1,4 +1,3 @@
-library(furrr)
 library(shiny)
 library(waiter)
 library(slider)
@@ -9,7 +8,6 @@ library(shinyMobile)
 library(RColorBrewer)
 library(shinymaterial)
 library(leaflet.extras)
-plan(multiprocess)
 
 rm(list = ls())
 
@@ -18,7 +16,8 @@ rm(list = ls())
 # saveRDS(county_geojson, 'county_geojson.rds')
 covid_counties <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv', stringsAsFactors = F) %>% mutate(date = as.Date(date)) %>% 
   mutate(fips = as.character(fips),
-         fips = ifelse(nchar(fips) == 4, paste0(0, fips), fips))
+         fips = ifelse(nchar(fips) == 4, paste0(0, fips), fips),
+         fips = ifelse(county == 'New York City', 36061, fips))
 covid_states <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv', stringsAsFactors = F) %>% mutate(date = as.Date(date))
 county_geojson <- readRDS('county_geojson.rds')
 
@@ -169,7 +168,8 @@ ui <- f7Page(
           title = '', 
             HTML(
           paste0(
-            'Only counties with at least 10 cases are included. Doubling rate is calculated based on a three day rolling average of daily case growth rates.
+            'Only counties with at least 10 cases are included. Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
+            <br>Note that data from all of New York City is labelled as New York County (Manhattan).
             <br>Data from <a href="https://github.com/nytimes/covid-19-data">The New York Times</a>, last updated ',
             format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard">GitHub</a> for code.'
             )
