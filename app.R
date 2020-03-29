@@ -7,6 +7,7 @@ library(highcharter)
 library(shinyMobile)
 library(RColorBrewer)
 library(leaflet.extras)
+library(shinycssloaders)
 
 rm(list = ls())
 
@@ -39,7 +40,7 @@ county_calc <- covid_counties %>%
   mutate(daily_growth_rate = (cases - lag(cases, 1)) / lag(cases, 1),
          growth_rate_rolling_average = slide_dbl(daily_growth_rate, mean, .before = 3, .complete = F),
          days_to_double = doubling_time(growth_rate_rolling_average)) %>% 
-  ungroup() 
+  ungroup()
 
 county_double_days <- county_calc %>% 
   group_by(county, state, fips) %>% 
@@ -101,31 +102,24 @@ county_geojson$days_to_double <- map(unique(county_geojson$fips), function(x) {
 
 
 ui <- f7Page(
-  title = 'COVID-19 US County Data',
-  init = f7Init(theme = "light"),
+  title = 'COVID-19 US County Dashboard',
+  init = f7Init(theme = "dark"),
   f7SingleLayout(
     navbar = f7Navbar(
-      title = 'COVID-19 US County Dashboard',
+      title = 'COVID-19 Dashboard',
       hairline = FALSE,
       shadow = TRUE,
       bigger = TRUE
     ),
     tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
     use_waiter(),
-    waiter_show_on_load(html = div(spin_loaders(42), h5('Pulling latest data...'))),
+    waiter_show_on_load(html = div(spin_loaders(42), HTML('<h5>Pulling latest data from The New York Times.<br>This may take a minute.</h5>'))),
     uiOutput('ui_layout'),
     f7Row(
       f7Col(
         f7Card(
-          title = '', 
-          HTML(
-            paste0(
-              'Only counties with at least 10 cases are included. Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
-            <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
-            <br>Data from <a href="https://github.com/nytimes/covid-19-data">The New York Times</a>, last updated ',
-              format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard">GitHub</a> for code.'
-            )
-          )
+          title = '',
+          uiOutput('notes_ui')
         )
       )
     )
@@ -144,10 +138,25 @@ server <- function(input, output, session) {
           f7Card(
             title = '',
             uiOutput('state_title'),
-            leafletOutput('county_map'),
+            withSpinner(leafletOutput('county_map'), type = 3, color = '#71eeb8', color.background = '#1c1c1d'),
           )
         ), 
         f7Col(
+          f7Card(
+            title = '',
+            uiOutput('state_title_chart'),
+            withSpinner(highchartOutput('county_chart'), type = 3, color = '#71eeb8', color.background = '#1c1c1d')
+          )
+        )
+      )
+    } else {
+      ui <- f7Row(
+        f7Col(
+          f7Card(
+            title = '',
+            uiOutput('state_title'),
+            leafletOutput('county_map'),
+          ),
           f7Card(
             title = '',
             uiOutput('state_title_chart'),
@@ -155,21 +164,6 @@ server <- function(input, output, session) {
           )
         )
       )
-    } else {
-      ui <- f7Row(
-          f7Col(
-            f7Card(
-              title = '',
-              uiOutput('state_title'),
-              leafletOutput('county_map'),
-            ),
-            f7Card(
-              title = '',
-              uiOutput('state_title_chart'),
-              highchartOutput('county_chart')
-            )
-          )
-        )
     }
     return(ui)
   })
@@ -193,7 +187,7 @@ server <- function(input, output, session) {
   
   output$state_title <- renderUI({
     div(style = 'display:inline-block',
-        div(style = 'display:inline-block;vertical-align:middle;', h2('COVID-19 total cases by county:')),
+        div(style = 'display:inline-block;vertical-align:middle;', h2('COVID-19 case doubling rate by county:')),
         div(style = 'display:inline-block;vertical-align:middle;margin-bottom:7px;font-size:20px !important;', f7Select('state', '', choices = sort(unique(county_calc$state[!county_calc$state %in% c('Guam', 'Virgin Islands')])), selected = 'New York'))
     )
   })
@@ -208,8 +202,8 @@ server <- function(input, output, session) {
     county_data() %>% 
       hchart(hcaes(x = days_since_10th_case, y = log_cases, group = county), type = 'line') %>% 
       hc_tooltip(formatter = JS('function() {return this.point.tooltip;}'), useHTML = TRUE) %>%
-      hc_xAxis(title = list(text = 'Days since 10th case', style = list(fontSize = '18px')), allowDecimals = FALSE, labels = list(style = list(fontSize = '16px'))) %>% 
-      hc_yAxis(title = list(text = 'Cases (log scale)', style = list(fontSize = '18px')), labels = list(formatter = JS("function() {return Math.round(Math.pow(Math.E, this.value)).toLocaleString('en')}"), style = list(fontSize = '16px'))) %>% 
+      hc_xAxis(title = list(text = 'Days since 10th case', style = list(fontSize = '18px', color = '#fff')), allowDecimals = FALSE, labels = list(style = list(fontSize = '16px', color = '#fff'))) %>% 
+      hc_yAxis(title = list(text = NA), labels = list(formatter = JS("function() {return Math.round(Math.pow(Math.E, this.value)).toLocaleString('en')}"), style = list(fontSize = '16px', color = '#fff'))) %>% 
       hc_plotOptions(line = list(marker = list(enabled = FALSE))) %>% 
       hc_colors(county_double_days$color[county_double_days$county %in% county_data()$county & county_double_days$state %in% county_data()$state]) %>%
       hc_legend()
@@ -221,7 +215,8 @@ server <- function(input, output, session) {
     
     this_state <- county_geojson[county_geojson$STATE == selected_state_fips,]
     
-    leaflet(this_state) %>%
+    leaflet(this_state, options = leafletOptions(
+      attributionControl=FALSE)) %>%
       addPolygons(smoothFactor = 0.5, fillOpacity = 1,
                   color = 'grey', weight = 1,
                   fillColor = ~pal(days_to_double),
@@ -232,10 +227,38 @@ server <- function(input, output, session) {
                   ), HTML),
                   labelOptions = labelOptions(textsize = "15px"),
                   highlightOptions = highlightOptions(color = "black", weight = 2, bringToFront = TRUE)) %>%
-      addLegend(pal = pal, values = county_double_days$days_to_double, opacity = 1.0,
+      addLegend(pal = pal, values = county_double_days$days_to_double, opacity = 1,
                 labFormat = labelFormat(transform = function(x) round(x, 1)),
-                title = 'Days until cases double') %>% 
-      setMapWidgetStyle(list(background = "white"))
+                title = HTML('Days until<br>cases double')) %>% 
+      setMapWidgetStyle(list(background = "#1c1c1d"))
+  })
+  
+  output$notes_ui <- renderUI({
+    req(input$deviceInfo)
+    if (input$deviceInfo$desktop) {
+      ui <- HTML(
+        paste0(
+          'Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
+            <br>Only counties with at least 10 cases are included.
+            <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
+            <br>Data from <a href="https://github.com/nytimes/covid-19-data" target="_blank" class="link external">The New York Times</a>, last updated ',
+          format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard" target="_blank" class="link external">GitHub</a> for code. Developed by <a href="https://www.thompsonanalytics.com/" target="_blank" class="link external">Charlie Thompson</a>.'
+        )
+      )
+    } else {
+      ui <- HTML(
+        paste0(
+          'Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
+            <br>Only counties with at least 10 cases are included.
+            <br>Note that some data comes from "Unknown" counties and is labelled as such.
+            <br>Also note that cases from all of New York City are labelled as New York County (Manhattan).
+            <br>Data from <a href="https://github.com/nytimes/covid-19-data" target="_blank" class="link external">The New York Times</a>, last updated ', format(max(covid_counties$date), '%B %d, %Y'), 
+          '. <br>See <a href="https://github.com/charlie86/covid-dashboard" target="_blank" class="link external">GitHub</a> for code. 
+          <br>Developed by <a href="https://www.thompsonanalytics.com/" target="_blank" class="link external">Charlie Thompson</a>.'
+        )
+      )
+    }
+    return(ui)
   })
   
 }

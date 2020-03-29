@@ -1,3 +1,13 @@
 .card-header {
     display: none;
 }
+
+/*.info.legend.leaflet-control {
+    background: #1c1c1d;
+    color: #fff !important;
+}
+*/
+
+.leaflet-control-zoom-out, .leaflet-control-zoom-in {
+    background: #1c1c1d;
+}
