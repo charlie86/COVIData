@@ -30,36 +30,6 @@ doubling_time <- function(growth_rate) {
   log(2) / log(1 + growth_rate)
 }
 
-case_tooltip <- "function() {
-       var points = this.points;
-            var pointsLength = points.length;
-            var tooltipMarkup = pointsLength ? '<span style=\"font-size: 10px\">' + points[0].key + ' days since 10th case</span><br/>' : '';
-            var index;
-            var y_value_exp;
-
-            for(index = 0; index < pointsLength; index += 1) {
-              y_value_exp = Math.round(Math.pow(Math.E, points[index].y)).toLocaleString('en');
-              tooltipMarkup += '<span style=\"color:' + points[index].series.color + '\">\u25CF</span> ' + points[index].series.name + ': <b>' + y_value_exp  + ' cases</b><br/>';
-            }
-
-            return tooltipMarkup;
-}"
-
-death_tooltip <- "function() {
-       var points = this.points;
-            var pointsLength = points.length;
-            var tooltipMarkup = pointsLength ? '<span style=\"font-size: 10px\">' + points[0].key + ' days since 10th death</span><br/>' : '';
-            var index;
-            var y_value_exp;
-
-            for(index = 0; index < pointsLength; index += 1) {
-              y_value_exp = Math.round(Math.pow(Math.E, this.y)).toLocaleString('en');
-              tooltipMarkup += '<span style=\"color:' + this.series.color + '\">\u25CF</span> ' + this.series.name + ': <b>' + y_value_exp + ' deaths</b><br/>';
-            }
-
-            return tooltipMarkup;
-}"
-
 county_calc <- covid_counties %>% 
   group_by(county, state, fips) %>% 
   arrange(date) %>% 
@@ -71,8 +41,6 @@ county_calc <- covid_counties %>%
          growth_rate_rolling_average = slide_dbl(daily_growth_rate, mean, .before = 3, .complete = F),
          days_to_double = doubling_time(growth_rate_rolling_average)) %>% 
   ungroup() 
-
-# View(county_calc %>% filter(county == 'New York City'))
 
 county_double_days <- county_calc %>% 
   group_by(county, state, fips) %>% 
@@ -88,21 +56,21 @@ county_double_days$color <- pal(county_double_days$days_to_double)
 
 county_geojson$fips <- str_replace_all(county_geojson$GEO_ID, '0500000US', '')
 
-county_geojson$deaths <- future_map(unique(county_geojson$fips), function(x) {
-  df <- covid_counties %>% 
-    filter(fips == x) 
-  
-  if (nrow(df) > 0) {
-    deaths <- df %>% 
-      filter(date == max(date)) %>% 
-      pull(deaths)
-  } else {
-    deaths <- 0
-  }
-  return(deaths)
-}) %>% unlist()
+# county_geojson$deaths <- map(unique(county_geojson$fips), function(x) {
+#   df <- covid_counties %>% 
+#     filter(fips == x) 
+#   
+#   if (nrow(df) > 0) {
+#     deaths <- df %>% 
+#       filter(date == max(date)) %>% 
+#       pull(deaths)
+#   } else {
+#     deaths <- 0
+#   }
+#   return(deaths)
+# }) %>% unlist()
 
-county_geojson$cases <- future_map(unique(county_geojson$fips), function(x) {
+county_geojson$cases <- map(unique(county_geojson$fips), function(x) {
   df <- covid_counties %>% 
     filter(fips == x) 
   
@@ -166,38 +134,19 @@ ui <- f7Page(
       f7Col(
         f7Card(
           title = '', 
-            HTML(
-          paste0(
-            'Only counties with at least 10 cases are included. Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
+          HTML(
+            paste0(
+              'Only counties with at least 10 cases are included. Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
             <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
             <br>Data from <a href="https://github.com/nytimes/covid-19-data">The New York Times</a>, last updated ',
-            format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard">GitHub</a> for code.'
+              format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard">GitHub</a> for code.'
             )
           )
         )
       )
     )
-    # useShinyalert(),
-    # uiOutput('inputs'),
-    # uiOutput('charts')
   )
 )
-
-# ui <- f7Page(title = 'COVID stats',
-#                     material_row(
-#                       material_column(width = 3, 
-#                                       material_card(title = '',
-#                                         'hi'
-#                                       )
-#                       ),
-#                       material_column(width = 9,
-#                                       material_card(
-#                                         title = uiOutput('state_title'),
-#                                         HTML('Green indicates a flatter curve; red reflects a steeper growth rate. Only counties with at least 10 cases are included. Data from <a href="https://github.com/nytimes/covid-19-data" target="_blank">The New York Times</a>.'),
-#                                         highchartOutput('county_chart', height = '600px')
-#                                       ))
-#                     )
-# )
 
 server <- function(input, output, session) {
   
@@ -265,50 +214,6 @@ server <- function(input, output, session) {
                 title = 'Days until cases double') %>% 
       setMapWidgetStyle(list(background = "white"))
   })
-  
-  # state_plot_df <- covid_states %>% 
-  #   group_by(fips) %>% 
-  #   filter(cases >= lag(cases), deaths >= lag(deaths)) %>%
-  #   filter(max(deaths) >= 10) %>% 
-  #   mutate(days_since_10th_death = as.numeric(date - min(date[deaths >= 10])),
-  #          log_deaths = log(deaths)) %>% 
-  #   ungroup() %>% 
-  #   left_join(state_lookup, by = c('state' = 'state.name')) %>% 
-  #   group_by(fips) %>% 
-  #   mutate(daily_growth_rate = (deaths - lag(deaths, 1)) / lag(deaths, 1),
-  #          growth_rate_rolling_average = slide_dbl(daily_growth_rate, mean, .before = 3, .complete = F),
-  #          days_to_double = doubling_time(growth_rate_rolling_average))
-  # 
-  # states_double_days <- state_plot_df %>% 
-  #   group_by(fips) %>% 
-  #   filter(date == max(date)) %>% 
-  #   arrange(state) %>% 
-  #   filter(!is.na(days_to_double)) %>% 
-  #   select(state, fips, days_to_double)
-  # 
-  # state_plot_df %>% 
-  #   inner_join(select(states_double_days, fips), by = 'fips') %>% 
-  #   filter(days_since_10th_death >= 0) %>% 
-  #   rowwise() %>% 
-  #   mutate(tooltip = htmltools::HTML(
-  #     paste0('<b><span style="font-size:14px">', state, '</span></b><br>',
-  #            format(date, '%m/%d'), ' - ', days_since_10th_death, ' days since 10th death<br><br>',
-  #            '<span style="font-size:14px"><b>', deaths, '</b> total deaths<br>',
-  #            'Doubling every <b>', round(days_to_double, 1), '</b> days</span>'
-  #     )
-  #   )) %>% 
-  #   ungroup() %>% 
-  #   hchart(hcaes(x = days_since_10th_death, y = log_deaths, group = state), type = 'line') %>% 
-  #   hc_tooltip(formatter = JS('function() {return this.point.tooltip;}'), useHTML = TRUE) %>%
-  #   hc_xAxis(title = list(text = 'Days since 10th death'), allowDecimals = FALSE) %>% 
-  #   hc_yAxis(title = list(text = 'Deaths (log scale)'), labels = list(formatter = JS("function() {return Math.round(Math.pow(Math.E, this.value))}"))) %>% 
-  #   hc_plotOptions(line = list(marker = list(enabled = F))) %>% 
-  #   hc_add_theme(hc_theme_smpl()) %>% 
-  #   hc_colors(colorize(states_double_days$days_to_double, brewer.pal(3, 'RdYlGn'))) %>%
-  #   hc_title(text = 'COVID-19 deaths by US state') %>% 
-  #   hc_subtitle(text = htmltools::HTML('Green indicates a flatter curve; red reflects a steeper growth rate. Only states with at least 10 deaths are included. Data from <a href="https://github.com/nytimes/covid-19-data" target="_blank">The New York Times</a>.')) %>% 
-  #   hc_legend()
-  
   
 }
 
