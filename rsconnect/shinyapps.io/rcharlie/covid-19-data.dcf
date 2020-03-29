@@ -1,0 +1,13 @@
+name: covid-19-data
+title: covid-19-data
+username:
+account: rcharlie
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2010762
+bundleId: 2935255
+url: https://rcharlie.shinyapps.io/covid-19-data/
+when: 1585375637.6839
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: us-counties.csv|us-states.csv
