@@ -6,7 +6,6 @@ library(tidyverse)
 library(highcharter)
 library(shinyMobile)
 library(RColorBrewer)
-library(shinymaterial)
 library(leaflet.extras)
 
 rm(list = ls())
@@ -102,34 +101,19 @@ county_geojson$days_to_double <- map(unique(county_geojson$fips), function(x) {
 
 
 ui <- f7Page(
-  title = 'COVID US County Dashboard',
+  title = 'COVID-19 US County Data',
   init = f7Init(theme = "light"),
   f7SingleLayout(
     navbar = f7Navbar(
-      title = 'COVID US County Dashboard',
+      title = 'COVID-19 US County Dashboard',
       hairline = FALSE,
       shadow = TRUE,
       bigger = TRUE
     ),
     tags$head(tags$link(rel = 'stylesheet', type = 'text/css', href = 'style.css')),
     use_waiter(),
-    waiter_show_on_load(html = div(spin_loaders(42), h5('Initializing app'))),
-    f7Row(
-      f7Col(
-        f7Card(
-          title = '',
-          uiOutput('state_title'),
-          leafletOutput('county_map'),
-        )
-      ), 
-      f7Col(
-        f7Card(
-          title = '',
-          uiOutput('state_title_chart'),
-          highchartOutput('county_chart')
-        )
-      )
-    ),
+    waiter_show_on_load(html = div(spin_loaders(42), h5('Pulling latest data...'))),
+    uiOutput('ui_layout'),
     f7Row(
       f7Col(
         f7Card(
@@ -151,6 +135,45 @@ ui <- f7Page(
 server <- function(input, output, session) {
   
   req(nrow(covid_counties) > 0)
+  
+  output$ui_layout <- renderUI({
+    req(input$deviceInfo)
+    if (input$deviceInfo$desktop) {
+      ui <- f7Row(
+        f7Col(
+          f7Card(
+            title = '',
+            uiOutput('state_title'),
+            leafletOutput('county_map'),
+          )
+        ), 
+        f7Col(
+          f7Card(
+            title = '',
+            uiOutput('state_title_chart'),
+            highchartOutput('county_chart')
+          )
+        )
+      )
+    } else {
+      ui <- f7Row(
+          f7Col(
+            f7Card(
+              title = '',
+              uiOutput('state_title'),
+              leafletOutput('county_map'),
+            ),
+            f7Card(
+              title = '',
+              uiOutput('state_title_chart'),
+              highchartOutput('county_chart')
+            )
+          )
+        )
+    }
+    return(ui)
+  })
+  
   
   county_data <- reactive({
     req(input$state)
@@ -202,7 +225,7 @@ server <- function(input, output, session) {
       addPolygons(smoothFactor = 0.5, fillOpacity = 1,
                   color = 'grey', weight = 1,
                   fillColor = ~pal(days_to_double),
-                  label = map(paste0('<b>', this_state$NAME, "</b>: <br>", 
+                  label = map(paste0('<b>', this_state$NAME, "</b><br>", 
                                      '<b>', prettyNum(this_state$cases, big.mark = ','), '</b>', ' total cases<br>',
                                      ifelse(!is.na(this_state$days_to_double), 
                                             paste0('Cases doubling every ', ifelse(round(this_state$days_to_double, 1) == 1, '', paste0('<b>', round(this_state$days_to_double, 1), '</b>')), ifelse(round(this_state$days_to_double, 1) == 1, ' <b>day</b>', ' days')), 'Not enough data to<br>calculate doubling rate')

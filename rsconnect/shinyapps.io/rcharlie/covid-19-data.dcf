@@ -5,8 +5,8 @@ account: rcharlie
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 2010762
-bundleId: 2937954
+bundleId: 2938018
 url: https://rcharlie.shinyapps.io/covid-19-data/
-when: 1585446133.59171
+when: 1585447783.08067
 asMultiple: FALSE
 asStatic: FALSE
