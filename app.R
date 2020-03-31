@@ -17,7 +17,8 @@ rm(list = ls())
 covid_counties <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv', stringsAsFactors = F) %>% mutate(date = as.Date(date)) %>% 
   mutate(fips = as.character(fips),
          fips = ifelse(nchar(fips) == 4, paste0(0, fips), fips),
-         fips = ifelse(county == 'New York City', 36061, fips))
+         fips = ifelse(county == 'New York City', 36061, fips)) %>% 
+  filter(county != 'Unknown')
 covid_states <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-states.csv', stringsAsFactors = F) %>% mutate(date = as.Date(date))
 county_geojson <- readRDS('county_geojson.rds')
 
@@ -49,6 +50,9 @@ county_double_days <- county_calc %>%
   filter(!is.na(days_to_double), cases >= 10, days_to_double != Inf) %>% 
   select(county, state, days_to_double, fips) %>% 
   ungroup()
+
+county_calc %>% 
+  filter(fips == 50027)
 
 pal <- colorNumeric('RdYlGn', county_double_days$days_to_double[!is.na(county_double_days$days_to_double) & county_double_days$days_to_double != Inf], na.color = 'transparent')
 
@@ -212,11 +216,14 @@ server <- function(input, output, session) {
   output$county_map <- renderLeaflet({
     
     selected_state_fips <- state_fips_lookup$fips[state_fips_lookup$state == input$state]
+    # selected_state_fips <- state_fips_lookup$fips[state_fips_lookup$state == 'Washington']
     
     this_state <- county_geojson[county_geojson$STATE == selected_state_fips,]
     
     leaflet(this_state, options = leafletOptions(
-      attributionControl=FALSE)) %>%
+      zoomControl = FALSE,
+      dragging = FALSE,
+      attributionControl = FALSE)) %>%
       addPolygons(smoothFactor = 0.5, fillOpacity = 1,
                   color = 'grey', weight = 1,
                   fillColor = ~pal(days_to_double),
@@ -229,7 +236,7 @@ server <- function(input, output, session) {
                   highlightOptions = highlightOptions(color = "black", weight = 2, bringToFront = TRUE)) %>%
       addLegend(pal = pal, values = county_double_days$days_to_double, opacity = 1,
                 labFormat = labelFormat(transform = function(x) round(x, 1)),
-                title = HTML('Days until<br>cases double')) %>% 
+                title = HTML('Days until<br>cases double'), position = 'topleft') %>% 
       setMapWidgetStyle(list(background = "#1c1c1d"))
   })
   
@@ -241,7 +248,7 @@ server <- function(input, output, session) {
           'Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
             <br>Only counties with at least 10 cases are included.
             <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
-            <br>Data from <a href="https://github.com/nytimes/covid-19-data" target="_blank" class="link external">The New York Times</a>, last updated ',
+            <br>Data from <a href="https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html" target="_blank" class="link external">The New York Times</a>, last updated ',
           format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard" target="_blank" class="link external">GitHub</a> for code. Developed by <a href="https://www.thompsonanalytics.com/" target="_blank" class="link external">Charlie Thompson</a>.'
         )
       )
