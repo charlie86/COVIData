@@ -247,9 +247,9 @@ server <- function(input, output, session) {
         paste0(
           'Case doubling rate is calculated based on a three day rolling average of daily case growth rates.
             <br>Only counties with at least 10 cases are included.
-            <br>Note that some data comes from "Unknown" counties and is labelled as such. Also note that cases from all of New York City are labelled as New York County (Manhattan).
+            <br>Note that some data comes from "Unknown" counties and are not included. Also note that cases from all of New York City are labelled as New York County (Manhattan).
             <br>Data from <a href="https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html" target="_blank" class="link external">The New York Times</a>, last updated ',
-          format(max(covid_counties$date), '%B %d, %Y'), '. See <a href="https://github.com/charlie86/covid-dashboard" target="_blank" class="link external">GitHub</a> for code. Developed by <a href="https://www.thompsonanalytics.com/" target="_blank" class="link external">Charlie Thompson</a>.'
+          format(max(covid_counties$date), '%m/%d/%Y'), '. See <a href="https://github.com/charlie86/covid-dashboard" target="_blank" class="link external">GitHub</a> for code. Developed by <a href="https://www.thompsonanalytics.com/" target="_blank" class="link external">Charlie Thompson</a>.'
         )
       )
     } else {
