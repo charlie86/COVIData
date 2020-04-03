@@ -11,6 +11,7 @@ library(shinycssloaders)
 
 rm(list = ls())
 
+
 # download.file('https://eric.clst.org/assets/wiki/uploads/Stuff/gz_2010_us_050_00_500k.json', 'us_county_geojson.json')
 # county_geojson <- rgdal::readOGR('us_county_geojson.json')
 # saveRDS(county_geojson, 'county_geojson.rds')
@@ -43,20 +44,30 @@ county_calc <- covid_counties %>%
          days_to_double = doubling_time(growth_rate_rolling_average)) %>% 
   ungroup()
 
+double_colors <- c("#660A0A", "#B22222", "#F07F16", "#F7B436", "#F6EE4E", "#70C26B", "#376BCC")
 county_double_days <- county_calc %>% 
   group_by(county, state, fips) %>% 
   filter(date == max(date)) %>% 
   arrange(state, county) %>% 
   filter(!is.na(days_to_double), cases >= 10, days_to_double != Inf) %>% 
   select(county, state, days_to_double, fips) %>% 
-  ungroup()
+  ungroup() %>% 
+  mutate(double_days_bin = case_when(days_to_double <= 1 ~ 1,
+                                     days_to_double <= 2 ~ 2,
+                                     days_to_double <= 3 ~ 3,
+                                     days_to_double <= 4 ~ 4,
+                                     days_to_double <= 7 ~ 5,
+                                     days_to_double <= 30 ~ 6,
+                                     days_to_double > 30 ~ 7,
+                                     TRUE ~ as.numeric(NA)))
 
-county_calc %>% 
-  filter(fips == 50027)
+pal <- colorFactor(double_colors, domain = as.character(1:7), na.color = 'transparent')
+# pal <- colorNumeric('RdYlGn', county_double_days$days_to_double[!is.na(county_double_days$days_to_double) & county_double_days$days_to_double != Inf], na.color = 'transparent')
 
-pal <- colorNumeric('RdYlGn', county_double_days$days_to_double[!is.na(county_double_days$days_to_double) & county_double_days$days_to_double != Inf], na.color = 'transparent')
+county_double_days$color <- pal(county_double_days$double_days_bin)
+# county_double_days$
 
-county_double_days$color <- pal(county_double_days$days_to_double)
+
 
 county_geojson$fips <- str_replace_all(county_geojson$GEO_ID, '0500000US', '')
 
@@ -226,7 +237,16 @@ server <- function(input, output, session) {
       attributionControl = FALSE)) %>%
       addPolygons(smoothFactor = 0.5, fillOpacity = 1,
                   color = 'grey', weight = 1,
-                  fillColor = ~pal(days_to_double),
+                  fillColor = ~pal(
+                    case_when(days_to_double <= 1 ~ 1,
+                              days_to_double <= 2 ~ 2,
+                              days_to_double <= 3 ~ 3,
+                              days_to_double <= 4 ~ 4,
+                              days_to_double <= 7 ~ 5,
+                              days_to_double <= 30 ~ 6,
+                              days_to_double > 30 ~ 7,
+                              TRUE ~ as.numeric(NA))
+                  ),
                   label = map(paste0('<b>', this_state$NAME, "</b><br>", 
                                      '<b>', prettyNum(this_state$cases, big.mark = ','), '</b>', ' total cases<br>',
                                      ifelse(!is.na(this_state$days_to_double), 
@@ -234,8 +254,16 @@ server <- function(input, output, session) {
                   ), HTML),
                   labelOptions = labelOptions(textsize = "15px"),
                   highlightOptions = highlightOptions(color = "black", weight = 2, bringToFront = TRUE)) %>%
-      addLegend(pal = pal, values = county_double_days$days_to_double, opacity = 1,
-                labFormat = labelFormat(transform = function(x) round(x, 1)),
+      addLegend(pal = pal, values = county_double_days$double_days_bin, opacity = 1,
+                labFormat = labelFormat(transform = function(x) {
+                  case_when(x == 1 ~ '0 to 1',
+                            x == 2 ~ '1 to 2',
+                            x == 3 ~ '2 to 3',
+                            x == 4 ~ '3 to 4',
+                            x == 5 ~ '4 to 7',
+                            x == 6 ~ '7 to 30',
+                            x == 7 ~ '30+')
+                }),
                 title = HTML('Days until<br>cases double'), position = 'topleft') %>% 
       setMapWidgetStyle(list(background = "#1c1c1d"))
   })
